@@ -28,6 +28,10 @@ export const DEPARTMENT_USERS: DepartmentUser[] = [
   { email: 'audit2@kwsb.gov.pk',           password: 'audit2@12345',  roleId: 'internal_audit_2',  displayName: 'INTERNAL AUDIT-2' },
   { email: 'law@kwsb.gov.pk',              password: 'law@12345',     roleId: 'law_department',    displayName: 'LAW DEPARTMENT' },
   { email: 'chro@kwsb.gov.pk',             password: 'chro@12345',    roleId: 'chro',              displayName: 'CHRO' },
+  { email: 'asst.cfo1@kwsb.gov.pk',        password: 'acfo1@12345',  roleId: 'sub_cfo_1',         displayName: 'ASST. CFO-1' },
+  { email: 'asst.cfo2@kwsb.gov.pk',        password: 'acfo2@12345',  roleId: 'sub_cfo_2',         displayName: 'ASST. CFO-2' },
+  { email: 'asst.cfo3@kwsb.gov.pk',        password: 'acfo3@12345',  roleId: 'sub_cfo_3',         displayName: 'ASST. CFO-3' },
+  { email: 'asst.cfo4@kwsb.gov.pk',        password: 'acfo4@12345',  roleId: 'sub_cfo_4',         displayName: 'ASST. CFO-4' },
   { email: 'mdoffice@kwsb.gov.pk',         password: 'md@12345',      roleId: 'md_office',         displayName: 'MD OFFICE' },
 ];
 

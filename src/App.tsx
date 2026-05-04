@@ -36,6 +36,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import AuthPage from "./pages/Auth";
 import RestrictedDashboard from "./pages/RestrictedDashboard";
+import CollectionEntry from "./pages/CollectionEntry";
 
 const queryClient = new QueryClient();
 
@@ -80,6 +81,7 @@ const App = () => (
                           <Route path="/book-section/bill-dispatch" element={<BillDispatch />} />
                           <Route path="/book-section/file-tracking" element={<FileTracking />} />
                           <Route path="/restricted" element={<RestrictedDashboard />} />
+                          <Route path="/collection-entry" element={<CollectionEntry />} />
                           <Route path="/book-section/cheque-record" element={<ChequeRecord />} />
                           <Route path="/book-section/books" element={<Books />} />
                           <Route path="/book-section/establishment" element={<Establishment />} />

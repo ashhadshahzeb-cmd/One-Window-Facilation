@@ -14,6 +14,7 @@ import {
   Stethoscope,
   Briefcase,
   Lock,
+  Plus,
   AlertCircle,
   CreditCard,
   LogOut,
@@ -114,7 +115,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
   const mainRef = useRef<HTMLDivElement>(null);
 
-  const isCFORole = userRole === 'cfo' || userRole === 'admin' || userRole === 'sub_cfo' || isAdmin;
+  const isCFORole = userRole === 'cfo' || userRole === 'admin' || userRole === 'sub_cfo' || userRole?.startsWith('sub_cfo_') || isAdmin;
 
   const [showSplash, setShowSplash] = useState(() => {
     if (!isCFORole) return false;
@@ -128,6 +129,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const topNavItems = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/book-section/file-tracking", icon: Shield, label: "File Tracking" },
+    { to: "/restricted", icon: Lock, label: "Restrict Dashboard" },
+    { to: "/collection-entry", icon: Plus, label: "Collection Entry" },
   ];
 
   // Filter categories based on user role
@@ -149,13 +152,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   ] : [];
 
-  const bottomNavItems = isCFORole ? [
-    { to: "/general-ledger", icon: BookOpen, label: "General Ledger" },
-    { to: "/book-section/cheque-record", icon: CreditCard, label: "Cheque Record" },
-    { to: "/bank-accounts", icon: Landmark, label: "Bank Accounts" },
-    { to: "/transactions", icon: ArrowLeftRight, label: "Transactions" },
-    { to: "/bank-entries", icon: CreditCard, label: "Bank Entries" },
-  ] : [];
+  const bottomNavItems = isCFORole ? [] : [];
 
   useGSAP(() => {
     setMobileOpen(false);

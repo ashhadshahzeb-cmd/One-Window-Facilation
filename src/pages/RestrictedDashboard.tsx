@@ -1,47 +1,113 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Lock, FileSpreadsheet, Download, TrendingUp, DollarSign, Calendar } from "lucide-react";
+import { Lock, FileSpreadsheet, TrendingUp, DollarSign, Calendar, Printer, Loader2, List, BarChart3, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const RestrictedDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
+  const [records, setRecords] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Dedicated Print Styles (Does not affect screen design)
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @media print {
+        @page { size: landscape; margin: 10mm; }
+        body * { visibility: hidden !important; background: white !important; color: black !important; }
+        #printable-section, #printable-section * { visibility: visible !important; }
+        #printable-section {
+          position: absolute !important; left: 0 !important; top: 0 !important;
+          width: 100% !important; display: block !important;
+          background: white !important; color: black !important;
+          padding: 10mm !important;
+        }
+        table { border-collapse: collapse !important; width: 100% !important; border: 2px solid black !important; }
+        th, td { border: 1px solid black !important; padding: 6px !important; font-size: 8pt !important; color: black !important; text-align: right !important; }
+        th { background: #f0f0f0 !important; font-weight: bold !important; text-align: center !important; }
+        .print-header { text-align: center !important; margin-bottom: 20px !important; border-bottom: 3px solid black !important; padding-bottom: 10px !important; }
+        .print-footer { margin-top: 50px !important; display: flex !important; justify-content: space-between !important; }
+        .sig-box { width: 200px !important; border-top: 1px solid black !important; text-align: center !important; padding-top: 5px !important; font-size: 9pt !important; }
+      }
+      #printable-section { display: none; }
+    `;
+    document.head.appendChild(style);
+    return () => { document.head.removeChild(style); };
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) fetchRecords();
+  }, [isAuthenticated]);
+
+  const fetchRecords = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.from('daily_collections').select('*').order('entry_date', { ascending: false });
+      if (error) throw error;
+      setRecords(data || []);
+    } catch (error: any) {
+      console.error("Error:", error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === "kwsc@786") {
       setIsAuthenticated(true);
-      toast.success("Access Granted");
+      toast.success("Welcome back, Cloud Data Ready");
     } else {
-      toast.error("Incorrect Password");
+      toast.error("Invalid Access Key");
     }
   };
 
+  const formatCurrency = (val: number) => new Intl.NumberFormat('en-PK', { minimumFractionDigits: 2 }).format(val);
+
+  const getMonthlyData = () => {
+    const monthlyMap = new Map();
+    records.forEach(rec => {
+      const month = rec.month || 'Unknown';
+      if (!monthlyMap.has(month)) monthlyMap.set(month, { month, wsc: 0, wscc: 0, iacc: 0, wtr: 0, isbc: 0, ccc: 0, asug: 0, cssw: 0 });
+      const m = monthlyMap.get(month);
+      m.wsc += (rec.wsc || 0); m.wscc += (rec.wscc || 0); m.iacc += (rec.iacc || 0);
+      m.wtr += (rec.wtr || 0); m.isbc += (rec.isbc || 0); m.ccc += (rec.ccc || 0);
+      m.asug += (rec.asug || 0); m.cssw += (rec.cssw || 0);
+    });
+    return Array.from(monthlyMap.values());
+  };
+
+  const totals = records.reduce((acc, curr) => ({
+    wsc: acc.wsc + (curr.wsc || 0), wscc: acc.wscc + (curr.wscc || 0), iacc: acc.iacc + (curr.iacc || 0),
+    total_rrg: acc.total_rrg + ((curr.wsc || 0) + (curr.iacc || 0)),
+    wtr: acc.wtr + (curr.wtr || 0), isbc: acc.isbc + (curr.isbc || 0), ccc: acc.ccc + (curr.ccc || 0),
+    asug: acc.asug + (curr.asug || 0), cssw: acc.cssw + (curr.cssw || 0),
+    total_others: acc.total_others + ((curr.wtr || 0) + (curr.isbc || 0) + (curr.ccc || 0) + (curr.asug || 0) + (curr.cssw || 0)),
+    grand_total: acc.grand_total + ((curr.wsc || 0) + (curr.iacc || 0) + (curr.wtr || 0) + (curr.isbc || 0) + (curr.ccc || 0) + (curr.asug || 0) + (curr.cssw || 0) + (curr.wscc || 0))
+  }), { wsc: 0, wscc: 0, iacc: 0, total_rrg: 0, wtr: 0, isbc: 0, ccc: 0, asug: 0, cssw: 0, total_others: 0, grand_total: 0 });
+
   if (!isAuthenticated) {
     return (
-      <div className="h-[80vh] flex items-center justify-center">
-        <Card className="w-full max-w-md border-[#0ea5e9]/20 bg-[#09090b]/50 backdrop-blur-xl">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 rounded-2xl bg-[#0ea5e9]/10 flex items-center justify-center mb-4">
-              <Lock className="w-8 h-8 text-[#0ea5e9]" />
+      <div className="h-[80vh] flex items-center justify-center p-4">
+        <Card className="w-full max-w-md border-white/10 bg-[#09090b]/80 backdrop-blur-2xl shadow-2xl overflow-hidden">
+          <div className="h-2 bg-gradient-to-r from-sky-500 via-emerald-500 to-sky-500" />
+          <CardHeader className="text-center pt-8">
+            <div className="mx-auto w-20 h-20 rounded-3xl bg-sky-500/10 flex items-center justify-center mb-6 border border-sky-500/20 shadow-inner">
+              <Lock className="w-10 h-10 text-sky-500" />
             </div>
-            <CardTitle className="text-2xl font-bold tracking-tight">Restricted Access</CardTitle>
-            <p className="text-sm text-muted-foreground mt-2">Please enter the administrative password to view the Daily Collection Statement.</p>
+            <CardTitle className="text-3xl font-black tracking-tight text-white uppercase">Finance Restricted</CardTitle>
+            <p className="text-muted-foreground text-sm mt-2 font-medium tracking-wide">Enter secure key for cloud synchronization.</p>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <Input
-                type="password"
-                placeholder="Enter Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-black/40 border-white/10 focus:border-[#0ea5e9]/50"
-              />
-              <Button type="submit" className="w-full bg-[#0ea5e9] hover:bg-[#0ea5e9]/90 text-white font-bold">
-                Unlock Dashboard
+          <CardContent className="px-8 pb-10">
+            <form onSubmit={handleLogin} className="space-y-6">
+              <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-white/5 border-white/10 h-12 text-center text-xl tracking-[0.5em] focus:border-sky-500/50 transition-all" />
+              <Button type="submit" className="w-full h-12 bg-sky-500 hover:bg-sky-400 text-white font-black text-lg shadow-[0_0_20px_rgba(14,165,233,0.3)]">
+                AUTHENTICATE
               </Button>
             </form>
           </CardContent>
@@ -50,139 +116,230 @@ const RestrictedDashboard = () => {
     );
   }
 
-  const data = [
-    { month: "JUL 2025", wsc: "1,897,843,243.83", wscc: "109,497,401.04", iacc: "2,007,340,644.87", total_rrg: "2,007,340,644.87", wtr: "291,521,006.35", isbc: "(1,668.00)", ccgwc: "-", as: "-", cssw: "37,879,896.84", toc: "329,399,235.19", total_kwsc: "2,337,039,879.06" },
-    { month: "AUG 2025", wsc: "1,883,507,509.07", wscc: "247,538,008.00", iacc: "10,000,000.00", total_rrg: "2,131,045,508.07", wtr: "299,885,758.83", isbc: "-", ccgwc: "-", as: "(600.00)", cssw: "11,188,570.44", toc: "311,073,529.27", total_kwsc: "2,442,119,037.34" },
-    { month: "SEP 2025", wsc: "1,972,017,909.23", wscc: "111,157,912.12", iacc: "97,185,101.54", total_rrg: "2,180,360,922.89", wtr: "322,736,412.99", isbc: "-", ccgwc: "-", as: "-", cssw: "31,097,646.44", toc: "353,834,059.43", total_kwsc: "2,534,194,982.32" },
-    { month: "OCT 2025", wsc: "2,123,025,949.63", wscc: "44,013,472.00", iacc: "112,326,958.07", total_rrg: "2,279,366,379.70", wtr: "295,283,112.85", isbc: "-", ccgwc: "(174.95)", as: "-", cssw: "33,346,436.93", toc: "328,629,374.83", total_kwsc: "2,607,995,754.53" },
-    { month: "NOV 2025", wsc: "1,599,197,575.12", wscc: "45,446,723.00", iacc: "199,813,027.64", total_rrg: "1,844,457,325.76", wtr: "303,413,541.70", isbc: "-", ccgwc: "-", as: "-", cssw: "22,865,494.90", toc: "326,279,036.60", total_kwsc: "2,170,736,362.36" },
-    { month: "DEC 2025", wsc: "1,849,674,953.56", wscc: "59,257,458.02", iacc: "112,765,821.89", total_rrg: "2,021,698,233.47", wtr: "364,527,924.63", isbc: "-", ccgwc: "(174.95)", as: "-", cssw: "34,898,117.91", toc: "399,425,867.59", total_kwsc: "2,421,124,101.06" },
-    { month: "JAN 2026", wsc: "1,760,228,911.83", wscc: "24,072,247.54", iacc: "73,918,862.52", total_rrg: "1,858,220,021.89", wtr: "357,087,707.25", isbc: "-", ccgwc: "-", as: "34,137,326.00", cssw: "37,369.59", toc: "381,252,758.84", total_kwsc: "2,239,472,780.73" },
-  ];
-
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-8 animate-in fade-in duration-1000 pb-20">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 px-2">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#0ea5e9]/10 flex items-center justify-center">
-              <FileSpreadsheet className="w-6 h-6 text-[#0ea5e9]" />
+          <div className="flex items-center gap-3 mb-2">
+            <div className="px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[10px] font-black uppercase tracking-widest">Live Cloud Data</div>
+            <div className="flex items-center gap-1.5 text-emerald-500">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Sync Secure</span>
             </div>
-            Restricted Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1 font-medium">Daily Collection Statement - Finance Department</p>
+          </div>
+          <h1 className="text-4xl font-black tracking-tighter text-white">Restricted Dashboard</h1>
+          <p className="text-muted-foreground text-sm font-medium italic mt-1">KW&SC Finance Department - Official Daily Statement</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" className="border-[#0ea5e9]/20 hover:bg-[#0ea5e9]/10">
-            <Download className="w-4 h-4 mr-2" />
-            Export Report
+        <div className="flex items-center gap-4">
+          <Button variant="outline" className="border-white/10 bg-white/5 hover:bg-white/10 h-11" onClick={fetchRecords} disabled={isLoading}>
+            <Loader2 className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh Data
           </Button>
-          <div className="px-4 py-2 rounded-lg bg-[#0ea5e9] text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-[#0ea5e9]/20">
-            <Calendar className="w-4 h-4" />
-            FY 2025-26
-          </div>
+          <Button className="bg-white text-black hover:bg-white/90 h-11 font-bold px-6 shadow-xl" onClick={() => window.print()}>
+            <Printer className="w-4 h-4 mr-2" />
+            Print Report
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-[#09090b]/50 border-white/5 backdrop-blur-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total KW&SC Collection</p>
-                <h3 className="text-2xl font-bold mt-1 text-[#0ea5e9]">22.91B</h3>
-                <p className="text-xs text-emerald-500 font-medium mt-2 flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3" /> +12.4% from last month
-                </p>
-              </div>
-              <div className="w-12 h-12 rounded-full bg-[#0ea5e9]/10 flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-[#0ea5e9]" />
-              </div>
+      {/* STATS GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {[
+          { label: 'Grand Total', value: totals.grand_total, color: 'text-sky-500', bg: 'bg-sky-500/10' },
+          { label: 'RRG Collection', value: totals.total_rrg, color: 'text-white', bg: 'bg-white/5' },
+          { label: 'Other Receipts', value: totals.total_others, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+        ].map((stat, i) => (
+          <Card key={i} className={`border-white/5 ${stat.bg} backdrop-blur-md overflow-hidden relative group`}>
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <DollarSign className="w-16 h-16" />
             </div>
-          </CardContent>
-        </Card>
-        {/* Add more summary cards if needed */}
+            <CardContent className="p-8">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">{stat.label}</p>
+              <h3 className={`text-4xl font-black tracking-tight ${stat.color}`}>
+                <span className="text-xl mr-1 font-normal opacity-50">Rs.</span>
+                {formatCurrency(stat.value)}
+              </h3>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      <Card className="border-[#0ea5e9]/20 bg-[#09090b]/40 backdrop-blur-md overflow-hidden">
-        <CardHeader className="border-b border-white/5 bg-white/[0.02] flex flex-row items-center justify-between">
-          <CardTitle className="text-lg font-bold">Collection Statement (RRG & Others)</CardTitle>
-          <div className="text-xs font-bold text-[#0ea5e9] tracking-widest uppercase">Provisional Data</div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-white/[0.03]">
-                <TableRow className="border-white/5 hover:bg-transparent">
-                  <TableHead className="font-bold text-xs uppercase tracking-wider text-white py-4">Month & Year</TableHead>
-                  <TableHead className="font-bold text-xs uppercase tracking-wider text-white">Water & Sewerage</TableHead>
-                  <TableHead className="font-bold text-xs uppercase tracking-wider text-white">Connection Charges</TableHead>
-                  <TableHead className="font-bold text-xs uppercase tracking-wider text-white">Arrear Collection</TableHead>
-                  <TableHead className="font-bold text-xs uppercase tracking-wider text-[#0ea5e9]">Total RRG</TableHead>
-                  <TableHead className="font-bold text-xs uppercase tracking-wider text-white">Water Tanker</TableHead>
-                  <TableHead className="font-bold text-xs uppercase tracking-wider text-white">Sub Soil Water</TableHead>
-                  <TableHead className="font-bold text-xs uppercase tracking-wider text-[#0ea5e9]">Total Collection</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.map((row, i) => (
-                  <TableRow key={i} className="border-white/5 hover:bg-white/[0.02] transition-colors">
-                    <TableCell className="font-bold text-sm">{row.month}</TableCell>
-                    <TableCell className="text-sm font-mono">{row.wsc}</TableCell>
-                    <TableCell className="text-sm font-mono">{row.wscc}</TableCell>
-                    <TableCell className="text-sm font-mono">{row.iacc}</TableCell>
-                    <TableCell className="text-sm font-bold text-[#0ea5e9]">{row.total_rrg}</TableCell>
-                    <TableCell className="text-sm font-mono">{row.wtr}</TableCell>
-                    <TableCell className="text-sm font-mono">{row.cssw}</TableCell>
-                    <TableCell className="text-sm font-bold text-[#0ea5e9]">{row.total_kwsc}</TableCell>
-                  </TableRow>
-                ))}
-                <TableRow className="bg-[#0ea5e9]/5 border-t-2 border-[#0ea5e9]/20">
-                  <TableCell className="font-black text-sm text-[#0ea5e9]">TOTAL</TableCell>
-                  <TableCell className="font-bold text-sm font-mono">17,304,145,334.58</TableCell>
-                  <TableCell className="font-bold text-sm font-mono">758,118,835.30</TableCell>
-                  <TableCell className="font-bold text-sm font-mono">549,717,352.78</TableCell>
-                  <TableCell className="font-black text-sm text-[#0ea5e9]">18,611,982,022.66</TableCell>
-                  <TableCell className="font-bold text-sm font-mono">3,230,019,642.78</TableCell>
-                  <TableCell className="font-bold text-sm font-mono">171,304,085.75</TableCell>
-                  <TableCell className="font-black text-sm text-[#0ea5e9]">22,913,303,323.29</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      {/* MAIN CONTENT AREA */}
+      <Tabs defaultValue="daily" className="w-full">
+        <div className="flex items-center justify-between mb-6 px-2">
+          <TabsList className="bg-[#09090b] border border-white/10 p-1 h-12 shadow-2xl">
+            <TabsTrigger value="daily" className="data-[state=active]:bg-sky-500 data-[state=active]:text-white px-8 font-black text-xs uppercase tracking-widest transition-all">Daily Records</TabsTrigger>
+            <TabsTrigger value="monthly" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white px-8 font-black text-xs uppercase tracking-widest transition-all">Monthly Summary</TabsTrigger>
+          </TabsList>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-        <Card className="bg-[#09090b]/50 border-white/5 p-6">
-          <h4 className="text-sm font-bold text-[#0ea5e9] mb-4 uppercase tracking-widest">Other Collections Breakdown</h4>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center p-3 rounded-lg bg-white/[0.02] border border-white/5">
-              <span className="text-sm text-muted-foreground">Infra Structure Betterment</span>
-              <span className="text-sm font-mono font-bold">(1,668.00)</span>
+        <TabsContent value="daily" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <Card className="border-white/10 bg-[#09090b]/40 backdrop-blur-xl overflow-hidden shadow-2xl">
+            <div className="bg-white/[0.03] border-b border-white/5 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <List className="w-4 h-4 text-sky-500" />
+                <h2 className="text-[10px] font-black tracking-[0.3em] uppercase text-sky-500">Daily Recorded Statement</h2>
+              </div>
             </div>
-            <div className="flex justify-between items-center p-3 rounded-lg bg-white/[0.02] border border-white/5">
-              <span className="text-sm text-muted-foreground">Commercial/Ground Water</span>
-              <span className="text-sm font-mono font-bold">(349.90)</span>
+            <CardContent className="p-0 overflow-x-auto">
+              <CollectionTable records={records} formatCurrency={formatCurrency} totals={totals} showDate={true} theme="sky" />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="monthly" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <Card className="border-white/10 bg-[#09090b]/40 backdrop-blur-xl overflow-hidden shadow-2xl">
+            <div className="bg-white/[0.03] border-b border-white/5 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <BarChart3 className="w-4 h-4 text-emerald-500" />
+                <h2 className="text-[10px] font-black tracking-[0.3em] uppercase text-emerald-500">Monthly Aggregated Summary</h2>
+              </div>
             </div>
-            <div className="flex justify-between items-center p-3 rounded-lg bg-white/[0.02] border border-white/5">
-              <span className="text-sm text-muted-foreground">Auction of Scrap</span>
-              <span className="text-sm font-mono font-bold">14,137,326.00</span>
-            </div>
-          </div>
-        </Card>
+            <CardContent className="p-0 overflow-x-auto">
+              <CollectionTable records={getMonthlyData()} formatCurrency={formatCurrency} totals={totals} showDate={false} theme="emerald" />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* PRINT SECTION (HIDDEN ON SCREEN) */}
+      <div id="printable-section">
+        <div className="print-header">
+          <h1 style={{ fontSize: '24pt', fontWeight: '900', margin: '0' }}>KW&SC FINANCE DEPARTMENT</h1>
+          <h2 style={{ fontSize: '14pt', margin: '5px 0', textTransform: 'uppercase' }}>Daily Financial Collection Statement</h2>
+          <p style={{ fontSize: '10pt' }}>Fiscal Year 2025-26 | Report Generated: {new Date().toLocaleString()}</p>
+        </div>
         
-        <div className="flex flex-col justify-center items-center p-8 rounded-3xl bg-gradient-to-br from-[#0ea5e9]/10 to-transparent border border-[#0ea5e9]/20 text-center">
-          <div className="w-16 h-16 rounded-full bg-[#0ea5e9]/20 flex items-center justify-center mb-4">
-            <Lock className="w-8 h-8 text-[#0ea5e9]" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px', marginBottom: '20px' }}>
+          <div style={{ border: '2px solid black', padding: '10px', textAlign: 'center' }}>
+            <p style={{ fontSize: '9pt', fontWeight: 'bold' }}>GRAND TOTAL COLLECTION</p>
+            <h2 style={{ fontSize: '18pt' }}>Rs. {formatCurrency(totals.grand_total)}</h2>
           </div>
-          <h3 className="text-xl font-bold mb-2">Secure Financial Reporting</h3>
-          <p className="text-sm text-muted-foreground max-w-xs">
-            This dashboard contains provisional financial data for KW&SC. Access is restricted to authorized personnel only.
-          </p>
+          <div style={{ border: '2px solid black', padding: '10px', textAlign: 'center' }}>
+            <p style={{ fontSize: '9pt', fontWeight: 'bold' }}>RRG COLLECTION</p>
+            <h2 style={{ fontSize: '18pt' }}>Rs. {formatCurrency(totals.total_rrg)}</h2>
+          </div>
+          <div style={{ border: '2px solid black', padding: '10px', textAlign: 'center' }}>
+            <p style={{ fontSize: '9pt', fontWeight: 'bold' }}>OTHER RECEIPTS</p>
+            <h2 style={{ fontSize: '18pt' }}>Rs. {formatCurrency(totals.total_others)}</h2>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'center' }}>Date</th>
+              <th style={{ textAlign: 'center' }}>Month</th>
+              <th>W&S</th><th>Conn</th><th>Arrear</th><th style={{ background: '#eee' }}>RRG Total</th>
+              <th>Tanker</th><th>Infra</th><th>Comm</th><th>Scrap</th><th>Soil</th><th style={{ background: '#eee' }}>Others Total</th>
+              <th style={{ background: '#ddd' }}>Grand Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((row, i) => (
+              <tr key={i}>
+                <td style={{ textAlign: 'center' }}>{row.entry_date}</td>
+                <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{row.month}</td>
+                <td>{formatCurrency(row.wsc)}</td><td>{formatCurrency(row.wscc)}</td><td>{formatCurrency(row.iacc)}</td>
+                <td style={{ fontWeight: 'bold' }}>{formatCurrency((row.wsc||0)+(row.iacc||0))}</td>
+                <td>{formatCurrency(row.wtr)}</td><td>{formatCurrency(row.isbc)}</td><td>{formatCurrency(row.ccc)}</td>
+                <td>{formatCurrency(row.asug)}</td><td>{formatCurrency(row.cssw)}</td>
+                <td style={{ fontWeight: 'bold' }}>{formatCurrency((row.wtr||0)+(row.isbc||0)+(row.ccc||0)+(row.asug||0)+(row.cssw||0))}</td>
+                <td style={{ fontWeight: 'black', background: '#f5f5f5' }}>{formatCurrency((row.wsc||0)+(row.iacc||0)+(row.wtr||0)+(row.isbc||0)+(row.ccc||0)+(row.asug||0)+(row.cssw||0)+(row.wscc||0))}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr style={{ background: '#ccc', fontWeight: 'bold' }}>
+              <td colSpan={2} style={{ textAlign: 'center' }}>TOTAL (FY 2025-26)</td>
+              <td>{formatCurrency(totals.wsc)}</td><td>{formatCurrency(totals.wscc)}</td><td>{formatCurrency(totals.iacc)}</td>
+              <td>{formatCurrency(totals.total_rrg)}</td>
+              <td>{formatCurrency(totals.wtr)}</td><td>{formatCurrency(totals.isbc)}</td><td>{formatCurrency(totals.ccc)}</td>
+              <td>{formatCurrency(totals.asug)}</td><td>{formatCurrency(totals.cssw)}</td>
+              <td>{formatCurrency(totals.total_others)}</td>
+              <td style={{ background: 'black', color: 'white' }}>{formatCurrency(totals.grand_total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div className="print-footer">
+          <div className="sig-box">PREPARED BY (ACCOUNTS)</div>
+          <div className="sig-box">ACCOUNTS OFFICER</div>
+          <div className="sig-box">DIRECTOR FINANCE (KW&SC)</div>
         </div>
       </div>
     </div>
+  );
+};
+
+const CollectionTable = ({ records, formatCurrency, totals, showDate, theme }: any) => {
+  const accentColor = theme === 'sky' ? 'text-sky-500' : 'text-emerald-500';
+  const accentBg = theme === 'sky' ? 'bg-sky-500/5' : 'bg-emerald-500/5';
+  const headerBg = theme === 'sky' ? 'bg-sky-500/10' : 'bg-emerald-500/10';
+
+  return (
+    <table className="w-full border-collapse text-[10px]">
+      <thead>
+        <tr className="border-b border-white/10 bg-white/[0.02]">
+          {showDate && <th className="p-4 font-black uppercase text-center border-r border-white/5 text-muted-foreground">Date</th>}
+          <th className="p-4 font-black uppercase text-center border-r border-white/5 text-muted-foreground">Month</th>
+          <th colSpan={4} className={`p-2 border-r border-white/5 font-black uppercase text-center ${headerBg} ${accentColor} border-b border-white/10`}>RRG Collection</th>
+          <th colSpan={6} className="p-2 border-r border-white/5 font-black uppercase text-center bg-white/5 text-white border-b border-white/10">KW&SC Other Receipts</th>
+          <th className="p-4 font-black uppercase text-center bg-white/10 text-white border-b border-white/10">Grand Total</th>
+        </tr>
+        <tr className="border-b border-white/5 bg-black/20 text-[8px] text-muted-foreground font-bold">
+          {showDate && <th className="border-r border-white/5" />}
+          <th className="border-r border-white/5" />
+          <th className="p-2 border-r border-white/5 uppercase">W&S</th>
+          <th className="p-2 border-r border-white/5 uppercase">Conn</th>
+          <th className="p-2 border-r border-white/5 uppercase">Arrear</th>
+          <th className={`p-2 border-r border-white/5 uppercase ${accentBg} ${accentColor}`}>Sub Total</th>
+          <th className="p-2 border-r border-white/5 uppercase">Tanker</th>
+          <th className="p-2 border-r border-white/5 uppercase">Infra</th>
+          <th className="p-2 border-r border-white/5 uppercase">Comm</th>
+          <th className="p-2 border-r border-white/5 uppercase">Scrap</th>
+          <th className="p-2 border-r border-white/5 uppercase">Soil</th>
+          <th className="p-2 border-r border-white/5 uppercase bg-white/5">Sub Total</th>
+          <th className="p-2 bg-white/10" />
+        </tr>
+      </thead>
+      <tbody className="text-white/80">
+        {records.map((row: any, idx: number) => (
+          <tr key={idx} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors font-mono">
+            {showDate && <td className="p-3 text-center border-r border-white/5 text-muted-foreground">{row.entry_date}</td>}
+            <td className="p-3 text-center border-r border-white/5 font-black text-white">{row.month}</td>
+            <td className="p-3 text-right border-r border-white/5">{formatCurrency(row.wsc)}</td>
+            <td className="p-3 text-right border-r border-white/5">{formatCurrency(row.wscc)}</td>
+            <td className="p-3 text-right border-r border-white/5">{formatCurrency(row.iacc)}</td>
+            <td className={`p-3 text-right border-r border-white/5 font-black ${accentBg} ${accentColor}`}>{formatCurrency((row.wsc || 0) + (row.iacc || 0))}</td>
+            <td className="p-3 text-right border-r border-white/5">{formatCurrency(row.wtr)}</td>
+            <td className="p-3 text-right border-r border-white/5">{formatCurrency(row.isbc)}</td>
+            <td className="p-3 text-right border-r border-white/5">{formatCurrency(row.ccc)}</td>
+            <td className="p-3 text-right border-r border-white/5">{formatCurrency(row.asug)}</td>
+            <td className="p-3 text-right border-r border-white/5">{formatCurrency(row.cssw)}</td>
+            <td className="p-3 text-right border-r border-white/5 font-black bg-white/5 text-white">{formatCurrency((row.wtr || 0) + (row.isbc || 0) + (row.ccc || 0) + (row.asug || 0) + (row.cssw || 0))}</td>
+            <td className="p-3 text-right font-black bg-white/10 text-white">{formatCurrency((row.wsc || 0) + (row.iacc || 0) + (row.wtr || 0) + (row.isbc || 0) + (row.ccc || 0) + (row.asug || 0) + (row.cssw || 0) + (row.wscc || 0))}</td>
+          </tr>
+        ))}
+      </tbody>
+      <tfoot>
+        <tr className="bg-black/40 font-black border-t-2 border-white/10">
+          <td colSpan={showDate ? 2 : 1} className="p-4 text-center text-xs uppercase tracking-widest text-muted-foreground border-r border-white/5">Totals</td>
+          <td className="p-3 text-right border-r border-white/5">{formatCurrency(totals.wsc)}</td>
+          <td className="p-3 text-right border-r border-white/5">{formatCurrency(totals.wscc)}</td>
+          <td className="p-3 text-right border-r border-white/5">{formatCurrency(totals.iacc)}</td>
+          <td className={`p-3 text-right border-r border-white/5 ${accentBg} ${accentColor}`}>{formatCurrency(totals.total_rrg)}</td>
+          <td className="p-3 text-right border-r border-white/5">{formatCurrency(totals.wtr)}</td>
+          <td className="p-3 text-right border-r border-white/5">{formatCurrency(totals.isbc)}</td>
+          <td className="p-3 text-right border-r border-white/5">{formatCurrency(totals.ccc)}</td>
+          <td className="p-3 text-right border-r border-white/5">{formatCurrency(totals.asug)}</td>
+          <td className="p-3 text-right border-r border-white/5">{formatCurrency(totals.cssw)}</td>
+          <td className="p-3 text-right border-r border-white/5 bg-white/5 text-white">{formatCurrency(totals.total_others)}</td>
+          <td className="p-4 text-right bg-sky-500 text-white text-xs">{formatCurrency(totals.grand_total)}</td>
+        </tr>
+      </tfoot>
+    </table>
   );
 };
 

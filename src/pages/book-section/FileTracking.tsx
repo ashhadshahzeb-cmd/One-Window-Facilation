@@ -83,11 +83,11 @@ export default function FileTracking() {
   const [viewingRole, setViewingRole] = useState(currentRole);
 
   useEffect(() => {
-    // Sub-CFO behaves as a department user for the CFO section
-    setViewingRole(currentRole === 'sub_cfo' ? 'cfo' : currentRole);
+    // Sub-CFO and Asst-CFOs behave as department users for the CFO section
+    setViewingRole((currentRole === 'sub_cfo' || currentRole?.startsWith('sub_cfo_')) ? 'cfo' : currentRole);
   }, [currentRole]);
 
-  const isCFORole = currentRole === 'cfo' || currentRole === 'sub_cfo' || isAdmin;
+  const isCFORole = currentRole === 'cfo' || currentRole === 'sub_cfo' || currentRole?.startsWith('sub_cfo_') || isAdmin;
 
   // New Form State
   const [isSavingForm, setIsSavingForm] = useState(false);
@@ -105,6 +105,8 @@ export default function FileTracking() {
     outward_date: new Date().toISOString().split('T')[0],
     amount: 0,
     remarks: "",
+    employee_number: "",
+    voucher_code: "",
   });
 
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -346,6 +348,8 @@ export default function FileTracking() {
       outward_date: new Date().toISOString().split('T')[0],
       amount: 0,
       remarks: "",
+      employee_number: "",
+      voucher_code: "",
     });
     setIsForwardingMode(false);
   };
@@ -395,6 +399,8 @@ export default function FileTracking() {
             sub_category: formData.subCategory,
             received_from: formData.received_from,
             amount: formData.amount,
+            employee_number: formData.employee_number,
+            voucher_code: formData.voucher_code,
             history: newHistory
           })
           .eq('receiving_number', formData.receiving_number);
@@ -432,6 +438,8 @@ export default function FileTracking() {
           outward_date: formData.outward_date,
           remarks: formData.remarks,
           amount: formData.amount,
+          employee_number: formData.employee_number,
+          voucher_code: formData.voucher_code,
           history: [snapshot],
           created_at: new Date().toISOString()
         };
@@ -469,6 +477,7 @@ export default function FileTracking() {
   };
 
   const [isPrintingQR, setIsPrintingQR] = useState(false);
+  const [isPrintingQRMinimal, setIsPrintingQRMinimal] = useState(false);
 
   const handlePrintQR = () => {
     setIsPrintingQR(true);
@@ -477,6 +486,16 @@ export default function FileTracking() {
       window.print();
       document.body.classList.remove('printing-qr-ticket');
       setIsPrintingQR(false);
+    }, 250);
+  };
+
+  const handlePrintQRMinimal = () => {
+    setIsPrintingQRMinimal(true);
+    document.body.classList.add('thermal-mode');
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove('thermal-mode');
+      setIsPrintingQRMinimal(false);
     }, 250);
   };
 
@@ -1842,6 +1861,36 @@ export default function FileTracking() {
                 </Select>
               </div>
 
+              {/* Conditional Field: Employee Number */}
+              {formData.mainCategory === 'employee' && formData.subCategory && (
+                <div className="space-y-2 animate-in slide-in-from-left-2 duration-300">
+                  <Label className="text-xs uppercase font-bold text-sky-500 flex items-center gap-2">
+                    <User className="w-3 h-3" /> Employee Number <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    placeholder="Enter Personal No. (e.g. 50012345)"
+                    value={formData.employee_number}
+                    onChange={e => setFormData({ ...formData, employee_number: e.target.value })}
+                    className="bg-sky-500/5 border-sky-500/30 font-bold focus-visible:ring-sky-500"
+                  />
+                </div>
+              )}
+
+              {/* Conditional Field: Voucher Code */}
+              {formData.mainCategory === 'contractor' && formData.subCategory && (
+                <div className="space-y-2 animate-in slide-in-from-left-2 duration-300">
+                  <Label className="text-xs uppercase font-bold text-emerald-500 flex items-center gap-2">
+                    <FileText className="w-3 h-3" /> Voucher Code <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    placeholder="Enter Voucher Reference"
+                    value={formData.voucher_code}
+                    onChange={e => setFormData({ ...formData, voucher_code: e.target.value })}
+                    className="bg-emerald-500/5 border-emerald-500/30 font-bold focus-visible:ring-emerald-500"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2 lg:col-span-1">
                 <Label className="text-xs uppercase font-bold text-muted-foreground">Subject <span className="text-red-500">*</span></Label>
                 <Input
@@ -2130,6 +2179,32 @@ export default function FileTracking() {
           
           @page { margin: 0; size: A5 portrait; }
         }
+
+        @media print {
+          body.thermal-mode { visibility: hidden !important; background: white !important; }
+          body.thermal-mode .thermal-only { visibility: visible !important; display: flex !important; }
+          body.thermal-mode .thermal-only * { visibility: visible !important; }
+          
+          .thermal-only {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 50mm !important;
+            height: 12mm !important;
+            display: none;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            background: white !important;
+            margin: 0 !important;
+            padding: 1mm !important;
+            border: 1px solid black !important;
+          }
+          
+          @page { size: 50mm 12mm; margin: 0; }
+        }
+        
+        .thermal-only { display: none; }
         
         /* Dashboard Dark Theme Overrides for Ticket Modal */
         [data-radix-portal] .bg-zinc-950, [data-radix-portal] .bg-slate-50 { background-color: #09090b !important; }
@@ -2310,18 +2385,41 @@ export default function FileTracking() {
                         </div>
                       </div>
 
-                      <div className="pt-2 flex justify-center">
-                        <Button
-                          className={`w-full bg-primary hover:bg-primary/90 text-white font-bold rounded-xl ${isPrintingQR ? 'hidden' : ''}`}
-                          onClick={handlePrintQR}
-                        >
-                          <Printer className="w-4 h-4 mr-2" /> Print Tracking Slip
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                        <div className="pt-2 flex flex-col gap-2 justify-center">
+                          <Button
+                            className={`w-full bg-primary hover:bg-primary/90 text-white font-bold rounded-xl ${isPrintingQR || isPrintingQRMinimal ? 'hidden' : ''}`}
+                            onClick={handlePrintQR}
+                          >
+                            <Printer className="w-4 h-4 mr-2" /> Print Tracking Slip
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className={`w-full border-primary/20 text-primary hover:bg-primary/10 font-bold rounded-xl ${isPrintingQR || isPrintingQRMinimal ? 'hidden' : ''}`}
+                            onClick={handlePrintQRMinimal}
+                          >
+                            <Printer className="w-4 h-4 mr-2" /> Print QR Only (Thermal)
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Minimal Thermal Printer Content (QR + Diary Only) */}
+                  <div className="thermal-only">
+                    <div style={{ marginRight: '2mm' }}>
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(`${window.location.origin}/public-track/${qrFullScreen?.diary}/${qrFullScreen?.receiving}`)}&color=000000`}
+                        alt="Thermal QR"
+                        style={{ width: '10mm', height: '10mm' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflow: 'hidden' }}>
+                      <p style={{ fontSize: '7pt', fontWeight: '900', margin: '0', color: 'black', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                        D: {qrFullScreen?.diary}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
             );
           })()}
         </DialogContent>
